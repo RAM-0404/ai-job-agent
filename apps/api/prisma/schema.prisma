@@ -1,0 +1,454 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+}
+
+model UserProfile {
+  id                  String          @id @default(uuid()) @db.Uuid
+  fullName            String
+  email               String          @unique
+  phone               String?
+  professionalSummary String?         @db.Text
+  currentTitle        String?
+  yearsOfExperience   Int?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  resumes             Resume[]
+  skills              Skill[]
+  experiences         Experience[]
+  education           Education[]
+  jobPreferences      JobPreference[]
+  matches             JobMatch[]
+  applications        Application[]
+  agentRuns           AgentRun[]
+  browserWorkflows    BrowserWorkflowRun[]
+
+  @@map("user_profiles")
+}
+
+model Resume {
+  id            String      @id @default(uuid()) @db.Uuid
+  userProfileId String      @db.Uuid
+  userProfile   UserProfile @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+  fileName      String
+  filePath      String
+  fileType      String
+  fileSize      Int
+  rawText       String?     @db.Text
+  version       Int         @default(1)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([userProfileId])
+  @@map("resumes")
+}
+
+model Skill {
+  id            String      @id @default(uuid()) @db.Uuid
+  userProfileId String      @db.Uuid
+  userProfile   UserProfile @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+  name          String
+  category      String?
+  proficiency   String?
+  createdAt     DateTime    @default(now())
+
+  @@index([userProfileId])
+  @@map("skills")
+}
+
+model Experience {
+  id            String      @id @default(uuid()) @db.Uuid
+  userProfileId String      @db.Uuid
+  userProfile   UserProfile @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+  company       String
+  jobTitle      String
+  startDate     DateTime
+  endDate       DateTime?
+  isCurrent     Boolean     @default(false)
+  description   String?     @db.Text
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([userProfileId])
+  @@map("experiences")
+}
+
+model Education {
+  id            String      @id @default(uuid()) @db.Uuid
+  userProfileId String      @db.Uuid
+  userProfile   UserProfile @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+  institution   String
+  degree        String?
+  fieldOfStudy  String?
+  startDate     DateTime?
+  endDate       DateTime?
+  description   String?     @db.Text
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([userProfileId])
+  @@map("educations")
+}
+
+model JobPreference {
+  id                  String      @id @default(uuid()) @db.Uuid
+  userProfileId       String      @db.Uuid
+  userProfile         UserProfile @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+  preferredRoles      String[]
+  preferredLocations  String[]
+  workModes           String[]
+  minimumSalary       Int?
+  maximumSalary       Int?
+  preferredIndustries String[]
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  @@index([userProfileId])
+  @@map("job_preferences")
+}
+
+enum JobSourceType {
+  MANUAL
+  API
+  FEED
+  CAREER_PAGE
+}
+
+enum WorkMode {
+  REMOTE
+  HYBRID
+  ONSITE
+  UNKNOWN
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERNSHIP
+  TEMPORARY
+  UNKNOWN
+}
+
+enum ExperienceLevel {
+  ENTRY
+  JUNIOR
+  MID
+  SENIOR
+  LEAD
+  MANAGER
+  DIRECTOR
+  UNKNOWN
+}
+
+enum DiscoveryRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model JobSource {
+  id            String         @id @default(uuid()) @db.Uuid
+  name          String         @unique
+  type          JobSourceType  @default(MANUAL)
+  baseUrl       String?
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  jobs          Job[]
+  discoveryRuns DiscoveryRun[]
+
+  @@map("job_sources")
+}
+
+model Job {
+  id              String          @id @default(uuid()) @db.Uuid
+  jobSourceId     String          @db.Uuid
+  jobSource       JobSource       @relation(fields: [jobSourceId], references: [id], onDelete: Cascade)
+  externalId      String?
+  title           String
+  companyName     String
+  description     String          @db.Text
+  location        String?
+  locations       String[]
+  workMode        WorkMode        @default(UNKNOWN)
+  employmentType  EmploymentType  @default(UNKNOWN)
+  experienceLevel ExperienceLevel @default(UNKNOWN)
+  salaryMin       Int?
+  salaryMax       Int?
+  salaryCurrency  String?
+  applicationUrl  String?
+  publishedAt     DateTime?
+  expiresAt       DateTime?
+  rawPayload      Json?
+  matches         JobMatch[]
+  applications    Application[]
+  agentRuns       AgentRun[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@unique([jobSourceId, externalId])
+  @@index([jobSourceId])
+  @@index([externalId])
+  @@index([companyName])
+  @@index([title])
+  @@index([publishedAt])
+  @@index([workMode])
+  @@index([location])
+  @@map("jobs")
+}
+
+model DiscoveryRun {
+  id           String             @id @default(uuid()) @db.Uuid
+  jobSourceId  String             @db.Uuid
+  jobSource    JobSource          @relation(fields: [jobSourceId], references: [id], onDelete: Cascade)
+  status       DiscoveryRunStatus @default(RUNNING)
+  startedAt    DateTime           @default(now())
+  completedAt  DateTime?
+  jobsFetched  Int                @default(0)
+  jobsCreated  Int                @default(0)
+  jobsUpdated  Int                @default(0)
+  jobsSkipped  Int                @default(0)
+  errorMessage String?            @db.Text
+  createdAt    DateTime           @default(now())
+
+  @@index([jobSourceId])
+  @@index([status])
+  @@index([startedAt])
+  @@map("discovery_runs")
+}
+
+enum MatchRecommendation {
+  APPLY
+  CONSIDER
+  LOW_PRIORITY
+  DO_NOT_APPLY
+}
+
+model JobMatch {
+  id              String              @id @default(uuid()) @db.Uuid
+  jobId           String              @db.Uuid
+  job             Job                 @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  userProfileId   String              @db.Uuid
+  userProfile     UserProfile         @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+  overallScore    Int
+  skillScore      Int
+  experienceScore Int
+  roleScore       Int
+  preferenceScore Int
+  locationScore   Int
+  recommendation  MatchRecommendation
+  strengths       String[]            @default([])
+  gaps            String[]            @default([])
+  aiAnalysis      Json                @default("{}")
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@unique([jobId, userProfileId])
+  @@index([jobId])
+  @@index([userProfileId])
+  @@index([overallScore])
+  @@index([recommendation])
+  @@map("job_matches")
+}
+
+enum ApplicationStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  EXPORTED
+}
+
+enum ApplicationDocumentType {
+  COVER_LETTER
+  RESUME_BULLETS
+  APPLICATION_SUMMARY
+}
+
+enum AnswerSource {
+  AI_GENERATED
+  USER_EDITED
+}
+
+model Application {
+  id              String                @id @default(uuid()) @db.Uuid
+  jobId           String                @db.Uuid
+  job             Job                   @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  userProfileId   String                @db.Uuid
+  userProfile     UserProfile           @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+  status          ApplicationStatus     @default(DRAFT)
+  rejectionReason String?               @db.Text
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  approvedAt      DateTime?
+  answers         ApplicationAnswer[]
+  documents       ApplicationDocument[]
+  agentRuns       AgentRun[]
+
+  @@unique([jobId, userProfileId])
+  @@index([jobId])
+  @@index([userProfileId])
+  @@index([status])
+  @@map("applications")
+}
+
+model ApplicationAnswer {
+  id             String        @id @default(uuid()) @db.Uuid
+  applicationId  String        @db.Uuid
+  application    Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  question       String        @db.Text
+  answer         String        @db.Text
+  originalAnswer String?       @db.Text
+  source         AnswerSource  @default(AI_GENERATED)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([applicationId])
+  @@map("application_answers")
+}
+
+model ApplicationDocument {
+  id              String                  @id @default(uuid()) @db.Uuid
+  applicationId   String                  @db.Uuid
+  application     Application             @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  type            ApplicationDocumentType
+  content         String                  @db.Text
+  originalContent String?                 @db.Text
+  source          AnswerSource            @default(AI_GENERATED)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  @@unique([applicationId, type])
+  @@index([applicationId])
+  @@map("application_documents")
+}
+
+enum AgentStatus {
+  IDLE
+  RUNNING
+  WAITING_FOR_HUMAN
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum AgentStep {
+  INITIALIZE
+  LOAD_CONTEXT
+  EVALUATE
+  GENERATE_APPLICATION
+  VALIDATE_APPLICATION
+  HUMAN_REVIEW
+  READY_FOR_SUBMISSION
+  COMPLETED
+  FAILED
+}
+
+enum AgentDecision {
+  CONTINUE
+  STOP
+  WAIT_FOR_HUMAN
+  APPROVED
+  REJECTED
+}
+
+model AgentRun {
+  id            String          @id @default(uuid()) @db.Uuid
+  userProfileId String          @db.Uuid
+  userProfile   UserProfile     @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+  jobId         String?         @db.Uuid
+  job           Job?            @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  applicationId String?         @db.Uuid
+  application   Application?    @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  status        AgentStatus     @default(IDLE)
+  currentStep   AgentStep       @default(INITIALIZE)
+  decision      AgentDecision?
+  matchScore    Int?
+  errorMessage  String?         @db.Text
+  startedAt     DateTime        @default(now())
+  completedAt   DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  events        AgentRunEvent[]
+
+  @@index([userProfileId])
+  @@index([jobId])
+  @@index([applicationId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("agent_runs")
+}
+
+model AgentRunEvent {
+  id         String    @id @default(uuid()) @db.Uuid
+  agentRunId String    @db.Uuid
+  agentRun   AgentRun  @relation(fields: [agentRunId], references: [id], onDelete: Cascade)
+  step       AgentStep
+  eventType  String
+  message    String    @db.Text
+  metadata   Json?
+  createdAt  DateTime  @default(now())
+
+  @@index([agentRunId])
+  @@index([createdAt])
+  @@index([step])
+  @@map("agent_run_events")
+}
+
+model BrowserWorkflowRun {
+  id                 String                     @id @default(uuid()) @db.Uuid
+  sessionId          String                     @unique
+  userProfileId      String?                    @db.Uuid
+  userProfile        UserProfile?               @relation(fields: [userProfileId], references: [id], onDelete: SetNull)
+  status             String                     @default("INITIALIZING")
+  version            Int                        @default(1)
+  currentStepIndex   Int                        @default(1)
+  currentStepId      String
+  currentStepHeading String?
+  currentUrl         String                     @db.Text
+  workflowState      Json
+  recoveryStatus     String?
+  lastReconciledAt   DateTime?
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+
+  operations         BrowserWorkflowOperation[]
+
+  @@index([sessionId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("browser_workflow_runs")
+}
+
+model BrowserWorkflowOperation {
+  id                 String              @id @default(uuid()) @db.Uuid
+  workflowRunId      String?             @db.Uuid
+  workflowRun        BrowserWorkflowRun? @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+  sessionId          String
+  idempotencyKey     String
+  operationType      String
+  requestPayloadHash String
+  status             String              @default("PENDING")
+  responsePayload    Json?
+  errorMessage       String?             @db.Text
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  completedAt        DateTime?
+
+  @@unique([sessionId, idempotencyKey])
+  @@index([sessionId])
+  @@index([idempotencyKey])
+  @@index([status])
+  @@index([createdAt])
+  @@map("browser_workflow_operations")
+}
+

@@ -1,0 +1,96 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-job-agent-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-ai_job_agent}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ai-job-agent-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-ai_job_agent}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: ai-job-agent-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOST=0.0.0.0
+      - CORS_ORIGIN=http://localhost:5173
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-ai_job_agent}?schema=public
+      - UPLOAD_DIR=/app/storage/resumes
+      - MAX_RESUME_SIZE_MB=10
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:7b}
+      - OLLAMA_TIMEOUT_MS=${OLLAMA_TIMEOUT_MS:-120000}
+      - MAX_AI_RESUME_CHARS=${MAX_AI_RESUME_CHARS:-30000}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - resume_storage:/app/storage/resumes
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ai-job-agent-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+    container_name: ai-job-agent-web
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+      # Public browser-accessible URL: Client-side JS executing in user browser uses this
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:3000}
+      # Internal service name URL: For inter-container communication across the Docker network
+      - API_INTERNAL_URL=http://api:3000
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - ai-job-agent-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:5173/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+networks:
+  ai-job-agent-net:
+    name: ai-job-agent-net
+    driver: bridge
+
+volumes:
+  postgres_data:
+    name: ai-job-agent-postgres-data
+  resume_storage:
+    name: ai-job-agent-resume-storage

@@ -1,0 +1,27 @@
+{
+  "name": "ai-job-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-first AI-powered Job Search and Job Application Agent",
+  "scripts": {
+    "dev": "pnpm --filter \"./apps/*\" --parallel run dev",
+    "dev:api": "pnpm --filter @ai-job-agent/api dev",
+    "dev:web": "pnpm --filter @ai-job-agent/web dev",
+    "build": "pnpm -r run build",
+    "lint": "pnpm -r run lint",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm --filter @ai-job-agent/api test",
+    "db:generate": "pnpm --filter @ai-job-agent/api db:generate",
+    "db:migrate": "pnpm --filter @ai-job-agent/api db:migrate",
+    "db:deploy": "pnpm --filter @ai-job-agent/api db:deploy",
+    "db:studio": "pnpm --filter @ai-job-agent/api db:studio",
+    "db:push": "pnpm --filter @ai-job-agent/api db:push"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

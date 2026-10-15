@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build & cache files
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+
+# Runtime storage & uploaded artifacts
+apps/api/storage/resumes/*
+!apps/api/storage/resumes/.gitkeep
+apps/api/storage/browser/*
+!apps/api/storage/browser/.gitkeep
+apps/api/storage/exports/*
+!apps/api/storage/exports/.gitkeep
+
+
+# Environment files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor & OS files
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
